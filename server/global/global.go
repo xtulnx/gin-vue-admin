@@ -1,6 +1,7 @@
 package global
 
 import (
+	"github.com/flipped-aurora/gin-vue-admin/server/utils/plugin"
 	"github.com/qiniu/qmgo"
 	"sync"
 
@@ -32,6 +33,9 @@ var (
 
 	BlackCache local_cache.Cache
 	lock       sync.RWMutex
+
+	GVA_PLUGIN plugin.Manger // 所有的插件
+	GVA_ENV    sync.Map      // 全局变量
 )
 
 // GetGlobalDBByDBName 通过名称获取db list中的db

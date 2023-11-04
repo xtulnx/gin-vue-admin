@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"github.com/flipped-aurora/gin-vue-admin/server/utils/plugin"
 	"time"
 
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
@@ -30,6 +31,20 @@ func RunWindowsServer() {
 		system.LoadAll()
 	}
 
+	// 初始化插件
+	if err := global.GVA_PLUGIN.ForeachUnsafe(func(p plugin.Base) error {
+		if m1, ok := p.(plugin.WithInit); ok {
+			if e1 := m1.PluginInit(); e1 != nil {
+				global.GVA_LOG.Error("插件「"+p.PluginName()+"」初始化失败!", zap.Any("err", e1))
+				return e1
+			}
+		}
+		return nil
+	}); err != nil {
+		global.GVA_LOG.Error("插件初始化失败，停止启动！")
+		return
+	}
+
 	Router := initialize.Routers()
 	Router.Static("/form-generator", "./resource/page")
 
@@ -39,6 +54,15 @@ func RunWindowsServer() {
 	// In order to ensure that the text order output can be deleted
 	time.Sleep(10 * time.Microsecond)
 	global.GVA_LOG.Info("server run success on ", zap.String("address", address))
+
+	defer func() {
+		_ = global.GVA_PLUGIN.ForeachUnsafe(func(p plugin.Base) error {
+			if m, ok := p.(plugin.WithRelease); ok {
+				m.PluginRelease()
+			}
+			return nil
+		})
+	}()
 
 	fmt.Printf(`
 	欢迎使用 gin-vue-admin

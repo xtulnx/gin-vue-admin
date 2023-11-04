@@ -1,8 +1,11 @@
 package initialize
 
 import (
+	"github.com/flipped-aurora/gin-vue-admin/server/utils/plugin"
 	swaggerFiles "github.com/swaggo/files"
+	"go.uber.org/zap"
 	"net/http"
+	"os"
 
 	"github.com/flipped-aurora/gin-vue-admin/server/docs"
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
@@ -15,13 +18,13 @@ import (
 // 初始化总路由
 
 func Routers() *gin.Engine {
-	
+
 	// 设置为发布模式
 	if global.GVA_CONFIG.System.Env == "public" {
 		gin.SetMode(gin.ReleaseMode) //DebugMode ReleaseMode TestMode
 	}
 	Router := gin.New()
-	
+
 	InstallPlugin(Router) // 安装插件
 	systemRouter := router.RouterGroupApp.System
 	exampleRouter := router.RouterGroupApp.Example
@@ -76,6 +79,18 @@ func Routers() *gin.Engine {
 		exampleRouter.InitCustomerRouter(PrivateGroup)              // 客户路由
 		exampleRouter.InitFileUploadAndDownloadRouter(PrivateGroup) // 文件上传下载功能路由
 
+	}
+
+	if err := global.GVA_PLUGIN.ForeachUnsafe(func(p plugin.Base) error {
+		if m1, ok := p.(plugin.WithRouter); ok {
+			if e1 := m1.PluginRouter(PrivateGroup, PublicGroup); e1 != nil {
+				global.GVA_LOG.Error("plugin ["+p.PluginName()+"] router error", zap.Error(e1))
+				return e1
+			}
+		}
+		return nil
+	}); err != nil {
+		os.Exit(1)
 	}
 
 	global.GVA_LOG.Info("router register success")

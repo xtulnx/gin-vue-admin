@@ -1,6 +1,8 @@
 package initialize
 
 import (
+	"github.com/flipped-aurora/gin-vue-admin/server/plugin/plugin-tool/utils"
+	"github.com/flipped-aurora/gin-vue-admin/server/utils/plugin"
 	"os"
 
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
@@ -61,4 +63,36 @@ func RegisterTables() {
 		os.Exit(0)
 	}
 	global.GVA_LOG.Info("register table success")
+
+	// 插件的数据库表
+	if err = global.GVA_PLUGIN.ForeachUnsafe(func(p plugin.Base) error {
+		if m, ok := p.(plugin.WithDbInit); ok {
+			if e1 := m.PluginInitDb(db); e1 != nil {
+				global.GVA_LOG.Error("插件「"+p.PluginName()+"」初始化数据库失败！", zap.Error(e1))
+				return e1
+			}
+		}
+		if m, ok := p.(WithTableInit); ok {
+			if tables := m.PluginInitTables(); len(tables) > 0 {
+				if e1 := db.AutoMigrate(tables...); e1 != nil {
+					global.GVA_LOG.Error("插件「"+p.PluginName()+"」注册数据库表失败！", zap.Error(e1))
+					return e1
+				}
+			}
+		}
+		if m, ok := p.(WithMenuInit); ok {
+			if menus := m.PluginInitMenus(); len(menus) > 0 {
+				utils.RegisterMenus(menus...)
+			}
+		}
+		if m, ok := p.(WithApiInit); ok {
+			if apis := m.PluginInitApis(); len(apis) > 0 {
+				utils.RegisterApis(apis...)
+			}
+		}
+		return nil
+	}); err != nil {
+		global.GVA_LOG.Error("插件注册数据库表失败，停止启动！")
+		os.Exit(1)
+	}
 }

@@ -4,9 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"github.com/flipped-aurora/gin-vue-admin/server/core/internal"
+	"github.com/flipped-aurora/gin-vue-admin/server/utils/plugin"
 	"github.com/gin-gonic/gin"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
@@ -60,15 +62,40 @@ func Viper(path ...string) *viper.Viper {
 
 	v.OnConfigChange(func(e fsnotify.Event) {
 		fmt.Println("config file changed:", e.Name)
-		if err = v.Unmarshal(&global.GVA_CONFIG); err != nil {
-			fmt.Println(err)
-		}
+		loadGlobalConfig(v)
 	})
-	if err = v.Unmarshal(&global.GVA_CONFIG); err != nil {
-		fmt.Println(err)
-	}
+
+	loadGlobalConfig(v)
 
 	// root 适配性 根据root位置去找到对应迁移位置,保证root路径有效
 	global.GVA_CONFIG.AutoCode.Root, _ = filepath.Abs("..")
 	return v
+}
+
+func loadGlobalConfig(v *viper.Viper) {
+	if err := v.Unmarshal(&global.GVA_CONFIG); err != nil {
+		fmt.Println(err)
+	}
+
+	// 加载插件的配置
+	_ = global.GVA_PLUGIN.ForeachUnsafe(func(p plugin.Base) error {
+		n := p.PluginCode()
+		if m, ok := p.(plugin.WithConfig); ok {
+			if c1 := m.PluginConfig(); c1 != nil {
+				if reflect.TypeOf(c1).Kind() == reflect.Ptr && reflect.TypeOf(c1).Elem().Kind() == reflect.Struct {
+					if m2, ok2 := p.(plugin.WithConfigReset); ok2 {
+						m2.PluginConfigReset()
+					}
+					if err := v.UnmarshalKey(n, c1); err != nil {
+						fmt.Println("插件「", p.PluginName(), "」的配置解析失败！", err)
+						return nil
+					}
+				} else {
+					fmt.Println("插件「", p.PluginName(), "」的配置必须是指针结构体！")
+					return nil
+				}
+			}
+		}
+		return nil
+	})
 }

@@ -2,6 +2,7 @@ package initialize
 
 import (
 	"fmt"
+	"github.com/flipped-aurora/gin-vue-admin/server/model/system"
 
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
 	"github.com/flipped-aurora/gin-vue-admin/server/middleware"
@@ -33,4 +34,14 @@ func InstallPlugin(Router *gin.Engine) {
 		global.GVA_CONFIG.Email.Port,
 		global.GVA_CONFIG.Email.IsSSL,
 	))
+}
+
+type WithTableInit interface {
+	PluginInitTables() []interface{} // 插件数据表初始化，可选
+}
+type WithMenuInit interface {
+	PluginInitMenus() []system.SysBaseMenu // 插件菜单初始化，可选
+}
+type WithApiInit interface {
+	PluginInitApis() []system.SysApi // 插件接口初始化，可选
 }
