@@ -53,3 +53,34 @@ func FailWithMessage(message string, c *gin.Context) {
 func FailWithDetailed(data interface{}, message string, c *gin.Context) {
 	Result(ERROR, data, message, c)
 }
+
+type ErrorWithCode interface {
+	ErrorCode() int
+}
+type ErrorWithHttpCode interface {
+	ErrorHttpCode() int
+}
+
+// ResultErr 处理错误，如果错误为nil，则返回成功，否则按照错误类型返回
+func ResultErr(data interface{}, e error, c *gin.Context) {
+	var httpCode = http.StatusOK
+	var code = ERROR
+	var msg = "内部错误"
+
+	if e == nil {
+		code, msg = SUCCESS, "操作成功"
+	} else {
+		msg = e.Error()
+		if ex, ok := e.(ErrorWithCode); ok {
+			code = ex.ErrorCode()
+		}
+		if ex, ok := e.(ErrorWithHttpCode); ok && ex.ErrorHttpCode() != 0 {
+			httpCode = ex.ErrorHttpCode()
+		}
+	}
+	c.JSON(httpCode, Response{code, data, msg})
+}
+
+func Err(e error, c *gin.Context) {
+	ResultErr(nil, e, c)
+}
