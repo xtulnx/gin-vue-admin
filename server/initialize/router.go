@@ -1,11 +1,15 @@
 package initialize
 
 import (
+	"fmt"
+	"github.com/flipped-aurora/gin-vue-admin/server/utils/ebus"
 	"github.com/flipped-aurora/gin-vue-admin/server/utils/plugin"
 	swaggerFiles "github.com/swaggo/files"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/flipped-aurora/gin-vue-admin/server/docs"
 	"github.com/flipped-aurora/gin-vue-admin/server/global"
@@ -24,8 +28,10 @@ func Routers() *gin.Engine {
 		gin.SetMode(gin.ReleaseMode) //DebugMode ReleaseMode TestMode
 	}
 	Router := gin.New()
-
-	InstallPlugin(Router) // 安装插件
+	ebus.Publish(global.EVENTROUTERRegisterInit, Router)
+	RouterRoot := Router.Group(global.GVA_CONFIG.System.RouterPrefix)
+	ebus.Publish(global.EVENTROUTERRegisterBegin, Router, RouterRoot)
+	InstallPlugin(RouterRoot) // 安装插件
 	systemRouter := router.RouterGroupApp.System
 	exampleRouter := router.RouterGroupApp.Example
 	// 如果想要不使用nginx代理前端网页，可以修改 web/.env.production 下的
@@ -42,12 +48,36 @@ func Routers() *gin.Engine {
 	// Router.Use(middleware.Cors()) // 直接放行全部跨域请求
 	// Router.Use(middleware.CorsByRules()) // 按照配置的规则放行跨域请求
 	//global.GVA_LOG.Info("use middleware cors")
-	docs.SwaggerInfo.BasePath = global.GVA_CONFIG.System.RouterPrefix
-	Router.GET(global.GVA_CONFIG.System.RouterPrefix+"/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	global.GVA_LOG.Info("register swagger handler")
+
+	if !global.GVA_CONFIG.System.SwaggerDisabled {
+		docs.SwaggerInfo.BasePath = global.GVA_CONFIG.System.RouterPrefix
+
+		docs.SwaggerInfo.Version = global.Version
+		docs.SwaggerInfo.Description = fmt.Sprintf(`%s
+
+版 本 号: **%s**
+编译时间: **%s**
+最近提交: **%s**
+提 交 人: **%s**
+提交信息: **%s**
+
+%s
+`, docs.SwaggerInfo.Description, global.Version, global.BuildTime, global.GitTag, global.GitAuthor, global.GitCommitMsg, strings.ReplaceAll(global.GitCommitLog, "<br/>", "\n"))
+
+		RouterRoot.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+		global.GVA_LOG.Info("register swagger handler")
+	} else {
+		RouterRoot.GET("/swagger/*any", func(ctx *gin.Context) {
+			ctx.JSON(http.StatusOK, gin.H{
+				"ip":  ctx.ClientIP(),
+				"now": time.Now(),
+			})
+		})
+	}
+
 	// 方便统一添加路由组前缀 多服务器上线使用
 
-	PublicGroup := Router.Group(global.GVA_CONFIG.System.RouterPrefix)
+	PublicGroup := RouterRoot.Group("")
 	{
 		// 健康监测
 		PublicGroup.GET("/health", func(c *gin.Context) {
@@ -58,7 +88,7 @@ func Routers() *gin.Engine {
 		systemRouter.InitBaseRouter(PublicGroup) // 注册基础功能路由 不做鉴权
 		systemRouter.InitInitRouter(PublicGroup) // 自动初始化相关
 	}
-	PrivateGroup := Router.Group(global.GVA_CONFIG.System.RouterPrefix)
+	PrivateGroup := RouterRoot.Group("")
 	PrivateGroup.Use(middleware.JWTAuth()).Use(middleware.CasbinHandler())
 	{
 		systemRouter.InitApiRouter(PrivateGroup, PublicGroup)    // 注册功能api路由
@@ -92,6 +122,8 @@ func Routers() *gin.Engine {
 	}); err != nil {
 		os.Exit(1)
 	}
+
+	ebus.Publish(global.EVENTROUTERRegisterSuccess, Router, PrivateGroup, PublicGroup)
 
 	global.GVA_LOG.Info("router register success")
 	return Router

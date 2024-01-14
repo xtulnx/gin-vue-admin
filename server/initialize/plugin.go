@@ -18,7 +18,7 @@ func PluginInit(group *gin.RouterGroup, Plugin ...plugin.Plugin) {
 	}
 }
 
-func InstallPlugin(Router *gin.Engine) {
+func InstallPlugin(Router *gin.RouterGroup) {
 	PublicGroup := Router.Group("")
 	fmt.Println("无鉴权插件安装==》", PublicGroup)
 	PrivateGroup := Router.Group("")

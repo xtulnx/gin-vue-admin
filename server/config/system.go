@@ -11,4 +11,11 @@ type System struct {
 	UseMultipoint bool   `mapstructure:"use-multipoint" json:"use-multipoint" yaml:"use-multipoint"` // 多点登录拦截
 	UseRedis      bool   `mapstructure:"use-redis" json:"use-redis" yaml:"use-redis"`                // 使用redis
 	UseMongo      bool   `mapstructure:"use-mongo" json:"use-mongo" yaml:"use-mongo"`                // 使用redis
+
+	// 禁用swagger
+	SwaggerDisabled bool `mapstructure:"swagger-disabled" json:"swagger-disabled" yaml:"swagger-disabled"`
+	// 禁用DB自动迁移
+	DbAutoMigrateDisabled bool `mapstructure:"db-auto-migrate-disabled" json:"db-auto-migrate-disabled" yaml:"db-auto-migrate-disabled"`
+	// 对orm的操作启用日志
+	DbOrmDebugEnabled bool `mapstructure:"db-orm-debug-enabled" json:"db-orm-debug-enabled" yaml:"db-orm-debug-enabled"`
 }
